@@ -25,7 +25,7 @@
 #define FILE_NOT_FOUND	2006
 #define MAX_PRIORITY	10
 #define MIN_MSGSZ		(512 - sizeof(long))	/* maximum message size for data in msg struct*/
-#define MAX_MSGSZ		MIN_MSGSZ * 10
+#define MAX_MSGSZ		MIN_MSGSZ * MAX_PRIORITY
 
 struct msg
 {

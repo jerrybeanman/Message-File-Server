@@ -1,4 +1,49 @@
+/*------------------------------------------------------------------------------------------------------------------
+-- SOURCE FILE:	server.c - Server service type of the program.
+-- 
+-- PROGRAM:		Message File Server
+-- 
+-- FUNCTIONS:	void server_mngr()
+--				void spawn_clnt_proc(int c_pid, int s_pid)
+--				char * read_file(FILE *fp)
+--				void send_packet(std::string fmsg, int priority, int index, int c_pid)
+--				
+-- DATE:		January 21, 2015
+-- 
+-- REVISIONS:	
+-- 
+-- DESIGNER:	Ruoqi Jia
+-- 
+-- PROGRAMMER:	Ruoqi Jia
+-- 
+-- NOTES: Acts as the server side of the message file server application. When it starts out, the server will be in a 
+--  wait state waiting for client to query for connections. Once the query has been recieved, the server will send back
+--  its process ID to the client and create a child process to handle communicating with the client. The child process 
+--  will waits for a file name from the client, and open the file and attempt to send the content to the client until
+--  it's done.
+--  
+--  *The size of the content sent to the server will be dependent on the priority level*
+--------------------------------------------------------------------------------------------------------------------*/
 #include "server.h"
+
+/*------------------------------------------------------------------------------------------------------------------ 
+-- FUNCTION:	server_mngr
+-- 
+-- DATE:		January 7, 2015
+-- 
+-- REVISIONS:	
+-- 
+-- DESIGNER:	Ruoqi Jia
+-- 
+-- PROGRAMMER:	Ruoqi Jia
+-- 
+-- INTERFACE:	void server_mngr()
+-- 
+-- RETURNS: void
+-- 
+-- NOTES: The main server process process. Responsible for establishing connection from the client and create a 
+--  child process to handle communications between that client.
+--------------------------------------------------------------------------------------------------------------------*/
 void server_mngr()
 {
 	char * s_pids;
@@ -21,6 +66,7 @@ void server_mngr()
 		printf("Client-[%d] Server-[%d]: Responding\n", c_pid, s_pid);
 		mesg_send(snd_msg);
 
+		/* Create a child process to handle the client */
 		if(fork() == 0)
 		{
 			spawn_clnt_proc(c_pid, s_pid);
@@ -29,6 +75,26 @@ void server_mngr()
 	}
 }
 
+/*------------------------------------------------------------------------------------------------------------------ 
+-- FUNCTION:	spawn_clnt_proc
+-- 
+-- DATE:		January 7, 2015
+-- 
+-- REVISIONS:	
+-- 
+-- DESIGNER:	Ruoqi Jia
+-- 
+-- PROGRAMMER:	Ruoqi Jia
+-- 
+-- INTERFACE:	void spawn_clnt_proc(int c_pid, int s_pid)
+-- 						int c_pid : The client's process ID
+--						int s_pid : The parent process ID
+-- RETURNS: void
+-- 
+-- NOTES: Responsible for communicating with the client after connection is established. Waits for a file name and attempt
+--  to open it if it exists. When the file is opened, its content is sent as dynamically sized packets based on the priority
+--  level to the client until its done. 
+--------------------------------------------------------------------------------------------------------------------*/
 void spawn_clnt_proc(int c_pid, int s_pid)
 {
 	FILE * fp;
@@ -45,27 +111,52 @@ void spawn_clnt_proc(int c_pid, int s_pid)
 
 	if((fp = fopen(rcv_msg->data, "r")) == NULL)
 	{
+		struct msg snd_msg;
+		/* Populate msg structure with str */
+		init_msg(&snd_msg, c_pid, 0, NULL);
+
+		mesg_send(&snd_msg);
 		err(FILE_NOT_FOUND);
 		return;
 	}
 
 	/* get whole file content into buffer */
 	fmsg = read_file(fp);
+
+	/* size of content sent is based off of the priority level */
 	msglen = rcv_msg->priority * MIN_MSGSZ;
+	
 	filesz = fmsg.size();
 
 	printf("Total size-[%d]\n", fmsg.size());
 	printf("Client[%d]: Start transferring...\n", c_pid);
-
+	
+	/* Sends each packet */
 	for(index = 0; (index+1) * msglen < filesz; index++)
-	{
+		send_packet(fmsg, msglen, index, c_pid);
 
-		send_packet(fmsg, rcv_msg->priority, index, c_pid);
-	}
-	send_packet(fmsg, rcv_msg->priority, index, c_pid);
+	send_packet(fmsg, msglen, index, c_pid);
 	printf("Finished transferring for client: [%d]. exiting...\n", c_pid);
 }
 
+/*------------------------------------------------------------------------------------------------------------------ 
+-- FUNCTION:	read_file
+-- 
+-- DATE:		January 7, 2015
+-- 
+-- REVISIONS:	
+-- 
+-- DESIGNER:	Ruoqi Jia
+-- 
+-- PROGRAMMER:	Ruoqi Jia
+-- 
+-- INTERFACE:	char * read_file(FILE *fp)
+-- 						FILE * fp : Pointer to the currently opened file that will be read
+--
+-- RETURNS: Address of the buffer which stores the file content after reading 
+-- 
+-- NOTES: Takes in a FILE pointer, reads it and store it into a dynamically sized string.
+--------------------------------------------------------------------------------------------------------------------*/
 char * read_file(FILE *fp)
 {
     char * buf = NULL, * tmp = NULL, c;
@@ -88,32 +179,54 @@ char * read_file(FILE *fp)
     return buf;
 }
 
-void send_packet(std::string fmsg, int priority, int index, int c_pid)
+/*------------------------------------------------------------------------------------------------------------------ 
+-- FUNCTION:	send_packet
+-- 
+-- DATE:		January 7, 2015
+-- 
+-- REVISIONS:	
+-- 
+-- DESIGNER:	Ruoqi Jia
+-- 
+-- PROGRAMMER:	Ruoqi Jia
+-- 
+-- INTERFACE:	void send_packet(std::string fmsg, int priority, int index, int msglen, int c_pid)
+-- 						std::string fmsg : Stores the file content as a string
+--						int idnex : Index to where the message will begin to send
+--						int msglen : The size of the data that will be sent
+--						int c_pid : Client's process ID, needed for mtype 
+--						
+--
+-- RETURNS: void
+-- 
+-- NOTES: Takes in a buffer, determine the size of the message that will be sent, initialize the message and sent it
+--  to the queue with the client's process ID as the mtype.
+--------------------------------------------------------------------------------------------------------------------*/
+void send_packet(std::string fmsg, int msglen, int index, int c_pid)
 {
 	struct msg * snd_msg;
-	int msglen = priority * MIN_MSGSZ;
+
+	/* Size of the buffer */
 	int filesz = fmsg.size();
+
+	/* Position of the starting point in the buffer */
 	int from   = index * msglen;
+
+	/* message content to send to the client */
 	char * str;
 
+	/* If this is not the last block of data that can be read from the buffer */
 	if((index+1) * msglen < filesz)
 		str = (char*)(fmsg.substr(from, msglen).c_str());
+	/* store the last block of data */
 	else
 		str = (char*)(fmsg.substr(index * msglen, filesz-(index * msglen))).c_str();
 	
 	printf("Block size:%d\n", strlen(str));
 	snd_msg = (struct msg *)malloc(sizeof(struct msg) + strlen(str));
+
+	/* Populate msg structure with str */
 	init_msg(snd_msg, c_pid, 0, str);
+
 	mesg_send(snd_msg);
-}
-
-void sub_str(char ** to, char * from, int begin, int end)
-{
-	int i, len = end - begin;
-	*to = (char*)malloc(len);
-	for(i = 0; i < len; i++)
-	{
-		*to[i] = from[begin++];
-	}
-
 }
