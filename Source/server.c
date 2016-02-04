@@ -97,21 +97,19 @@ void server_mngr()
 --------------------------------------------------------------------------------------------------------------------*/
 void spawn_clnt_proc(int c_pid, int s_pid)
 {
-	FILE * fp;
-	std::string fmsg;
-	int index = 0, msglen, filesz;
+	int fp, index = 0, msglen, filesz;
 
-	struct msg * rcv_msg = (struct msg *)malloc(sizeof(struct msg));
+	struct msg snd_msg;
+	struct msg rcv_msg;
 
 	printf("Client[%d]: waiting for file name...\n", c_pid);
 	/* query for client's file name structure*/
-	mesg_recv(rcv_msg, s_pid);
+	mesg_recv(&rcv_msg, s_pid);
 
-	printf("Client-[%d] Server-[%d]: Recieved File Name-[%s], Priority-[%d]\n", c_pid, s_pid, rcv_msg->data, rcv_msg->priority);
+	printf("Client-[%d] Server-[%d]: Recieved File Name-[%s], Priority-[%d]\n", c_pid, s_pid, rcv_msg.data, rcv_msg.priority);
 
-	if((fp = fopen(rcv_msg->data, "r")) == NULL)
+	if((fp = open(rcv_msg.data, O_RDONLY)) == -1)
 	{
-		struct msg snd_msg;
 		/* Populate msg structure with str */
 		init_msg(&snd_msg, c_pid, 0, NULL);
 
@@ -119,24 +117,12 @@ void spawn_clnt_proc(int c_pid, int s_pid)
 		err(FILE_NOT_FOUND);
 		return;
 	}
-
-	/* get whole file content into buffer */
-	fmsg = read_file(fp);
-
 	/* size of content sent is based off of the priority level */
-	msglen = rcv_msg->priority * MIN_MSGSZ;
+	msglen = rcv_msg.priority * MIN_MSGSZ;
 	
-	filesz = fmsg.size();
-
-	printf("Total size-[%d]\n", fmsg.size());
-	printf("Client[%d]: Start transferring...\n", c_pid);
+	/* get whole file content into buffer */
+	read_file(fp, &snd_msg, msglen, c_pid);
 	
-	/* Sends each packet */
-	for(index = 0; (index+1) * msglen < filesz; index++)
-		send_packet(fmsg, msglen, index, c_pid);
-
-	send_packet(fmsg, msglen, index, c_pid);
-	printf("Finished transferring for client: [%d]. exiting...\n", c_pid);
 }
 
 /*------------------------------------------------------------------------------------------------------------------ 
@@ -157,76 +143,27 @@ void spawn_clnt_proc(int c_pid, int s_pid)
 -- 
 -- NOTES: Takes in a FILE pointer, reads it and store it into a dynamically sized string.
 --------------------------------------------------------------------------------------------------------------------*/
-char * read_file(FILE *fp)
+void read_file(int fp, struct msg * snd_msg, int msglen, int c_pid)
 {
-    char * buf = NULL, * tmp = NULL, c;
-    size_t size = 0, index = 0;
+    char buffer[msglen];
+    int result;
+	printf("Client[%d]: Start transferring...\n", c_pid);
 
-    do{
+	/* keep reading data block by block */
+    while((result = read(fp, buffer, msglen)) >= msglen)
+    {
+    	buffer[msglen] = '\0';
+		init_msg(snd_msg, c_pid, 0, buffer);
+		mesg_send(snd_msg);
+		memset(buffer, 0, sizeof(buffer));
+    }
+	init_msg(snd_msg, c_pid, 0, buffer);
+	snd_msg->hasNext = 0;
 
-        /* Check if we need to expand. */
-        if (index >= size) 
-        {
-            size += MAX_MSGSZ;
-            tmp = (char *)realloc(buf, size);
-        }
-        buf = tmp;
-		c = (char)fgetc(fp);
-        if(feof(fp))
-        	break;
-        buf[index++] = c;
-    }while (1); 
-    return buf;
-}
-
-/*------------------------------------------------------------------------------------------------------------------ 
--- FUNCTION:	send_packet
--- 
--- DATE:		January 7, 2015
--- 
--- REVISIONS:	
--- 
--- DESIGNER:	Ruoqi Jia
--- 
--- PROGRAMMER:	Ruoqi Jia
--- 
--- INTERFACE:	void send_packet(std::string fmsg, int priority, int index, int msglen, int c_pid)
--- 						std::string fmsg : Stores the file content as a string
---						int idnex : Index to where the message will begin to send
---						int msglen : The size of the data that will be sent
---						int c_pid : Client's process ID, needed for mtype 
---						
---
--- RETURNS: void
--- 
--- NOTES: Takes in a buffer, determine the size of the message that will be sent, initialize the message and sent it
---  to the queue with the client's process ID as the mtype.
---------------------------------------------------------------------------------------------------------------------*/
-void send_packet(std::string fmsg, int msglen, int index, int c_pid)
-{
-	struct msg * snd_msg;
-
-	/* Size of the buffer */
-	int filesz = fmsg.size();
-
-	/* Position of the starting point in the buffer */
-	int from   = index * msglen;
-
-	/* message content to send to the client */
-	char * str;
-
-	/* If this is not the last block of data that can be read from the buffer */
-	if((index+1) * msglen < filesz)
-		str = (char*)(fmsg.substr(from, msglen).c_str());
-	/* store the last block of data */
-	else
-		str = (char*)(fmsg.substr(index * msglen, filesz-(index * msglen))).c_str();
-	
-	printf("Block size:%d\n", strlen(str));
-	snd_msg = (struct msg *)malloc(sizeof(struct msg) + strlen(str));
-
-	/* Populate msg structure with str */
-	init_msg(snd_msg, c_pid, 0, str);
+	/* null terminate the last packet */
+	snd_msg->data[result] = '\0';
 
 	mesg_send(snd_msg);
+    printf("Finished transferring for client: [%d]. exiting...\n", c_pid);
 }
+

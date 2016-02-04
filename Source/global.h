@@ -9,7 +9,8 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <signal.h>
-#include <string>
+#include <fcntl.h>
+#include <ctype.h>
 
 #define NUM_CMDLARG		4		/* exact number of command line arguments */
 #define SERVER_MSG		100		/* message type the server responds to the client */
@@ -23,8 +24,8 @@
 #define MSGRCV			2004
 #define MSGCTL			2005
 #define FILE_NOT_FOUND	2006
-#define MAX_PRIORITY	10
-#define MIN_MSGSZ		(512 - sizeof(long))	/* maximum message size for data in msg struct*/
+#define MAX_PRIORITY	100
+#define MIN_MSGSZ		40	/* maximum message size for data in msg struct*/
 #define MAX_MSGSZ		MIN_MSGSZ * MAX_PRIORITY
 
 struct msg
@@ -32,6 +33,7 @@ struct msg
 	long mtype;
 	size_t len;
 	int priority;
+	int hasNext;
 	char data[MAX_MSGSZ];
 };
 

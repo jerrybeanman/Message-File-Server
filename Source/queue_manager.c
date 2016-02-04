@@ -159,7 +159,7 @@ void init_msg(struct msg * message, long type, int priority, char * data)
 
 	message->mtype = type;
 	message->priority = priority;
-
+	message->hasNext = 1;
 	/* null out the buffer */
 	init_empty_buf(message->data);
 
@@ -167,7 +167,7 @@ void init_msg(struct msg * message, long type, int priority, char * data)
 	{
 		message->len = strlen(data);
 		/* copy data into buffer */
-		memcpy(message->data, data, message->len);
+		memcpy(message->data, data, message->len); 
 	}
 
 }
@@ -204,6 +204,6 @@ void kill_q(int sig)
 	if (msgctl(msqid, IPC_RMID, NULL) == -1)
 		err(MSGCTL);
 
-	/* send SIGINT and exists process */
+	/* send SIGINT and exits process */
 	kill(getpid(), sig);
 }

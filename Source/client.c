@@ -48,22 +48,23 @@ void client_mngr(char * filename, int priority)
 {
 	char * c_pids;
 	int s_pid, c_pid = getpid();
-	struct msg * snd_msg = (struct msg *)malloc(sizeof(struct msg));
-	struct msg * rcv_msg = (struct msg *)malloc(sizeof(struct msg));
+	struct msg snd_msg;
+	struct msg rcv_msg;;
 
 	/* establish connection */
-	connect(c_pid, snd_msg, rcv_msg, &s_pid);
+	connect(c_pid, &snd_msg, &rcv_msg, &s_pid);
 
 	printf("Client-[%d] Server-[%d]: Sending file name-[%s], Priority-[%d]\n", c_pid, s_pid, filename, priority);
 
 	/* initialize message for file request */
-	init_msg(snd_msg, s_pid, priority, filename);
+	init_msg(&snd_msg, s_pid, priority, filename);
 
 	/* send the message */
-	mesg_send(snd_msg);
+	mesg_send(&snd_msg);
 
 	/* waits for the file packets and read it */
-	get_qfile(rcv_msg, c_pid, priority);
+	get_qfile(&rcv_msg, c_pid, priority);
+
 
 }
 
@@ -139,7 +140,7 @@ void connect(int c_pid, struct msg * snd_msg, struct msg * rcv_msg, int * s_pid)
 void get_qfile(struct msg * rcv_msg, int c_pid, int priority)
 {
 	printf("Waiting for file...\n");
-
+	int msglen = MIN_MSGSZ * priority;
 	/* wait for server server message*/
 	mesg_recv(rcv_msg, c_pid);
 
@@ -149,17 +150,22 @@ void get_qfile(struct msg * rcv_msg, int c_pid, int priority)
 		err(FILE_NOT_FOUND);
 		exit(1);
 	}
+	
+	/* turn off SIGINT when reading */
+	signal(SIGINT, SIG_IGN);
 
 	/* display message block */
 	printf("%s", rcv_msg->data);
 
 	/* keep reading message until the file has been fully read*/
-	while(strlen(rcv_msg->data) > MIN_MSGSZ * priority)
+	while(rcv_msg->hasNext)
 	{
-		rcv_msg = (struct msg*)malloc(sizeof(struct msg));
 		mesg_recv(rcv_msg, c_pid);
 		printf("%s", rcv_msg->data);
 	}
+
+	/* turn on SIGINT*/
+	signal(SIGINT, kill_q);
 
 	printf("\nClient-[%d]: End of file, exiting...\n", getpid());
 }

@@ -26,8 +26,11 @@ int main(int argc, char * argv[])
 	signal(SIGINT, kill_q);
 	
 	/* check if argc == 4*/
-	if(valid_cmdl(argc, argv[1]) == -1)
+	if(valid_cmdl(argc, argv[1], argv[3]) == -1)
+	{
 		usage(argv[0]);
+		exit(0);
+	}
 	
 	/* retrieves the type of service this process needs to run as */
 	switch(get_srvice(argv[1]))

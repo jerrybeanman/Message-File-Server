@@ -91,30 +91,6 @@ void spawn_clnt_proc(int c_pid, int s_pid);
 -- 
 -- NOTES: Takes in a FILE pointer, reads it and store it into a dynamically sized string.
 --------------------------------------------------------------------------------------------------------------------*/
-char * read_file(FILE *fp);
+void read_file(int fp, struct msg * snd_msg, int msglen, int c_pid);
 
-/*------------------------------------------------------------------------------------------------------------------ 
--- FUNCTION:	send_packet
--- 
--- DATE:		January 7, 2015
--- 
--- REVISIONS:	
--- 
--- DESIGNER:	Ruoqi Jia
--- 
--- PROGRAMMER:	Ruoqi Jia
--- 
--- INTERFACE:	void send_packet(std::string fmsg, int priority, int index, int msglen, int c_pid)
--- 						std::string fmsg : Stores the file content as a string
---						int idnex : Index to where the message will begin to send
---						int msglen : The size of the data that will be sent
---						int c_pid : Client's process ID, needed for mtype 
---						
---
--- RETURNS: void
--- 
--- NOTES: Takes in a buffer, determine the size of the message that will be sent, initialize the message and sent it
---  to the queue with the client's process ID as the mtype.
---------------------------------------------------------------------------------------------------------------------*/
-void send_packet(std::string fmsg, int priority, int index, int s_pid);
 #endif

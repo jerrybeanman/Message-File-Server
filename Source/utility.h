@@ -39,12 +39,13 @@
 -- INTERFACE:	int valid_cmdl(int argc, char * srvice)
 -- 						int argc : the number of command line arguments
 --						char * srvice : the type of service to execute, taken from argv[1]
+--						char * priority : the priority level
 --
 -- RETURNS: 0 on valid command, -1 on failure
 -- 
 -- NOTES: Checkes if a valid set of command line arguments is entered. 
 --------------------------------------------------------------------------------------------------------------------*/
-int valid_cmdl(int argc, char * srvice);
+int valid_cmdl(int argc, char * srvice, char * priority);
 
 /*------------------------------------------------------------------------------------------------------------------ 
 -- FUNCTION:	usage

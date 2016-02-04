@@ -42,11 +42,14 @@
 -- 
 -- NOTES: Checkes if a valid set of command line arguments is entered. 
 --------------------------------------------------------------------------------------------------------------------*/
-int valid_cmdl(int argc, char * srvice)
+int valid_cmdl(int argc, char * srvice, char * priority)
 {
 	/* if we're executing it as the server, ignore argc */
 	if(strcmp(srvice, "-s") == 0)
 		return 0;
+	printf("%d\n", atoi(priority));
+	if(atoi(priority) > 100 || atoi(priority) < 0)
+		return -1;
 
 	if(argc != NUM_CMDLARG)
 		return -1;
@@ -77,7 +80,7 @@ void usage(char * exec)
 	printf("usage: %s type filename priority\n", exec);
 	printf("	type: -c[client] || -s[server]\n");
 	printf("	filename: file name\n");
-	printf("	priority: 0-10, ascending\n");
+	printf("	priority: 1-100, ascending\n");
 	printf("|-------------------------------------|\n");
 	exit(1);
 }
